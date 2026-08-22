@@ -85,16 +85,72 @@ Use this if you prefer hosting your own local IPFS gateway.
 
 ---
 
-## Phase 3 — Blockchain Setup (Contracts & Ganache)
+## Phase 3 — Blockchain Setup (Smart Contracts Deployment)
 
-The system deploys smart contracts to store individual block hashes (sidechain) and anchor periodic batch checkpoints (main-chain).
+The system uses two smart contracts:
+1. **`EnvMonitor.sol`** (stored in `blockchain/contracts/`): Records individual sensor readings, maintains the hash chain on-chain, and verifies chain integrity.
+2. **`CIDRegistry.sol`** (stored in `iot-backend/contracts/`): Anchors periodic batch manifests of IPFS CIDs.
 
-### 1. Start Ganache (Local Ethereum Development Chain)
-* **If using Ganache UI**: Open the application, click **Quickstart**, and verify it is running on host `127.0.0.1` and port `7545`.
-* **If using Ganache CLI**: Run `npx ganache` (or `npx ganache --port 7545`).
+You can deploy these contracts using either **MetaMask & Remix IDE** (recommended for browser wallets) or **Truffle**.
 
-### 2. Compile and Deploy the Main-Chain Smart Contract
-1. Navigate to the `blockchain/` folder:
+---
+
+### Option A: Deploying via Remix IDE & MetaMask (Recommended)
+
+This method lets you deploy the contracts directly using your MetaMask wallet on any EVM network (e.g., local Ganache, Polygon Amoy Testnet, or Polygon Mainnet).
+
+#### 1. Setup the Network in MetaMask
+* **For Local Ganache Development**:
+  1. Open MetaMask, click the network dropdown, and select **Add network** → **Add a network manually**.
+  2. Enter the details:
+     * **Network Name**: Ganache Local
+     * **New RPC URL**: `http://127.0.0.1:7545` (if using Ganache UI) or `http://127.0.0.1:8545` (if using Ganache CLI/Truffle)
+     * **Chain ID**: `1337` (standard) or `5777` (Ganache UI default)
+     * **Currency Symbol**: `ETH`
+  3. Import one of your Ganache test accounts into MetaMask by copying its private key from the Ganache interface and pasting it into MetaMask under **Import Account**.
+* **For Polygon Amoy Testnet**:
+  1. Go to MetaMask network settings and add the Polygon Amoy network (Chain ID: `80002`, RPC URL: `https://rpc-amoy.polygon.technology`).
+  2. Get free test tokens from a faucet (e.g., [Polygon Faucet](https://faucet.polygon.technology/)).
+
+#### 2. Load Contracts into Remix IDE
+1. Open [Remix IDE](https://remix.ethereum.org/) in your browser.
+2. Under the file explorer, create two new files:
+   * `EnvMonitor.sol` — Copy the code from [EnvMonitor.sol](file:///c:/Users/viv_gothi/OneDrive/Desktop/iot-env-monitor/blockchain/contracts/EnvMonitor.sol).
+   * `CIDRegistry.sol` — Copy the code from [CIDRegistry.sol](file:///c:/Users/viv_gothi/OneDrive/Desktop/iot-env-monitor/iot-backend/contracts/CIDRegistry.sol).
+
+#### 3. Compile the Contracts
+1. Select `EnvMonitor.sol` in Remix.
+2. Click the **Solidity Compiler** icon on the left sidebar.
+3. Choose compiler version `0.8.0` (or matching version) and click **Compile EnvMonitor.sol**.
+4. Repeat the same step for `CIDRegistry.sol` (you can use compiler `0.8.20` or higher).
+
+#### 4. Deploy via MetaMask
+1. Click the **Deploy & Run Transactions** icon on the left sidebar.
+2. In the **Environment** dropdown, select **Injected Provider - MetaMask**. Remix will ask to connect to your wallet. Ensure MetaMask is connected to your target network.
+3. Select **EnvMonitor** from the *Contract* dropdown and click **Deploy**.
+4. Confirm the transaction in MetaMask.
+5. Once mined, copy the contract address from the **Deployed Contracts** list. This will be your `GANACHE_CONTRACT_ADDRESS` (or `ANCHOR_CONTRACT_ADDRESS`).
+6. Select **CIDRegistry** from the *Contract* dropdown and click **Deploy**.
+7. Confirm in MetaMask and copy the deployed contract address. This will be your `ANCHOR_CONTRACT_ADDRESS` on your sidechain.
+
+#### 5. Export Private Key for Backend Configuration
+For the backend server to submit transactions on your behalf, it needs a private key.
+1. Open MetaMask.
+2. Click the three dots next to your account name and select **Account details**.
+3. Click **Show private key**, enter your MetaMask password, and copy the private key.
+4. Set this key as `POLYGON_PRIVATE_KEY` in the backend `.env` file (ensure it has a `0x` prefix).
+
+---
+
+### Option B: Deploying via Truffle & Ganache (Local CLI Alternative)
+
+Use this if you prefer using the command line and local Truffle scripts.
+
+#### 1. Start Ganache
+* Start your Ganache UI and check that it is running on port `7545`.
+
+#### 2. Deploy EnvMonitor
+1. Open a terminal and go to `blockchain/`:
    ```bash
    cd blockchain
    ```
@@ -102,7 +158,7 @@ The system deploys smart contracts to store individual block hashes (sidechain) 
    ```bash
    npm install
    ```
-3. Compile the Solidity contracts:
+3. Compile and deploy the contracts:
    ```bash
    npx truffle compile
    ```
@@ -110,24 +166,24 @@ The system deploys smart contracts to store individual block hashes (sidechain) 
    ```bash
    npx truffle migrate --network ganache
    ```
-5. Copy the deployed contract address for `EnvMonitor` from the console output (e.g., `0x...`). You will need this address for the backend `.env` config.
+5. Copy the deployed `EnvMonitor` address from the output.
 
-### 3. Deploy the Sidechain Smart Contract (`CIDRegistry`)
-The backend provides `CIDRegistry.sol` in `iot-backend/contracts/` to anchor IPFS manifest CIDs on Polygon (or local mock networks).
-To deploy it locally:
-1. Copy `iot-backend/contracts/CIDRegistry.sol` into the `blockchain/contracts/` directory.
-2. Create a new migration file `blockchain/migrations/3_deploy_cidregistry.js` with the following content:
+#### 3. Deploy CIDRegistry
+1. Copy `iot-backend/contracts/CIDRegistry.sol` into `blockchain/contracts/`.
+2. Create a new migration file `blockchain/migrations/3_deploy_cidregistry.js`:
    ```javascript
    const CIDRegistry = artifacts.require("CIDRegistry");
    module.exports = function (deployer) {
      deployer.deploy(CIDRegistry);
    };
    ```
-3. Re-run migrations on Ganache:
+3. Re-run migrations:
    ```bash
    npx truffle migrate --network ganache --reset
    ```
-4. Copy the deployed `CIDRegistry` address. This will be your `ANCHOR_CONTRACT_ADDRESS` on your local network.
+4. Copy the deployed `CIDRegistry` address.
+
+---
 
 ---
 
