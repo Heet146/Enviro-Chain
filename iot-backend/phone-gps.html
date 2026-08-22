@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Send GPS to Firebase</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h2 {
+            color: #1B4F72;
+            margin-bottom: 6px;
+        }
+
+        .sub {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            background: #1D9E75;
+            margin-bottom: 16px;
+        }
+
+        .btn.stop {
+            background: #E24B4A;
+        }
+
+        .status {
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .ok {
+            background: #D5F5E3;
+            color: #1E8449;
+        }
+
+        .err {
+            background: #FADBD8;
+            color: #C0392B;
+        }
+
+        .inf {
+            background: #D6EAF8;
+            color: #1B4F72;
+        }
+
+        .coords {
+            font-family: monospace;
+            font-size: 13px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            text-align: left;
+            color: #333;
+            display: none;
+        }
+
+        .count {
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>GPS to Firebase</h2>
+        <p class="sub">Sends your location to ESP32 via Firebase</p>
+
+        <button class="btn" id="btn" onclick="toggle()">
+            Start Sending Location
+        </button>
+
+        <div id="status" class="status inf">
+            Press Start to begin sending your GPS to Firebase
+        </div>
+
+        <div id="coords" class="coords"></div>
+        <div id="count" class="count"></div>
+    </div>
+
+    <script type="module">
+        // ── Paste your Firebase config here ──
+        // Firebase Console → Project Settings → Your apps → Config
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set }
+            from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA4-2z22fWvwLvbTtQmrF7WpW37hIrSEnM",
+            authDomain: "iot-env-monitor-90a09.firebaseapp.com",
+            databaseURL: "https://iot-env-monitor-90a09-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "iot-env-monitor-90a09",
+            storageBucket: "iot-env-monitor-90a09.firebasestorage.app",
+            messagingSenderId: "116657773379",
+            appId: "1:116657773379:web:5f3c20d14ae6780391adf6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        let timer = null;
+        let count = 0;
+        let isRunning = false;
+
+        function setStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.className = 'status ' + type;
+            el.innerText = msg;
+        }
+
+        window.toggle = function () {
+            if (isRunning) {
+                clearInterval(timer);
+                isRunning = false;
+                document.getElementById('btn').innerText = 'Start Sending Location';
+                document.getElementById('btn').className = 'btn';
+                setStatus('Stopped.', 'inf');
+            } else {
+                isRunning = true;
+                document.getElementById('btn').innerText = 'Stop';
+                document.getElementById('btn').className = 'btn stop';
+                setStatus('Getting your location...', 'inf');
+                sendGPS();
+                timer = setInterval(sendGPS, 15000);
+            }
+        };
+
+        function sendGPS() {
+            if (!navigator.geolocation) {
+                setStatus('Geolocation not supported.', 'err');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const alt = pos.coords.altitude || 0;
+                    const acc = pos.coords.accuracy;
+
+                    // Show on screen
+                    const coordEl = document.getElementById('coords');
+                    coordEl.style.display = 'block';
+                    coordEl.innerText =
+                        'Lat: ' + lat.toFixed(6) + '\n' +
+                        'Lng: ' + lng.toFixed(6) + '\n' +
+                        'Alt: ' + alt.toFixed(1) + ' m\n' +
+                        'Accuracy: ±' + acc.toFixed(0) + ' m';
+
+                    // Write to Firebase at /gps/NODE_001
+                    try {
+                        await set(ref(db, 'gps/NODE_001'), {
+                            lat,
+                            lng,
+                            alt,
+                            accuracy: acc,
+                            updatedAt: Date.now(),
+                            source: 'phone'
+                        });
+                        count++;
+                        setStatus('Location sent to Firebase!', 'ok');
+                        document.getElementById('count').innerText =
+                            'Sent ' + count + ' time(s) — updates every 15 seconds';
+                    } catch (e) {
+                        setStatus('Firebase error: ' + e.message, 'err');
+                    }
+                },
+                (err) => {
+                    const msgs = {
+                        1: 'Location permission denied. Go to Chrome Settings → Site Settings → Location → Allow.',
+                        2: 'Location unavailable. Try moving near a window.',
+                        3: 'Location request timed out. Try again.'
+                    };
+                    setStatus(msgs[err.code] || err.message, 'err');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+            );
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS Bridge</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h2 { color: #1B4F72; font-size: 22px; margin-bottom: 8px; }
+    .sub { color: #888; font-size: 14px; margin-bottom: 24px; }
+    .btn {
+      background: #1D9E75; color: white;
+      border: none; padding: 16px;
+      font-size: 17px; border-radius: 10px;
+      cursor: pointer; width: 100%;
+      margin-bottom: 16px;
+    }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .status {
+      padding: 14px; border-radius: 10px;
+      font-size: 14px; margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .ok  { background: #D5F5E3; color: #1E8449; }
+    .err { background: #FADBD8; color: #C0392B; }
+    .inf { background: #D6EAF8; color: #1B4F72; }
+    .war { background: #FEF9E7; color: #B7770D; }
+    .coords {
+      font-size: 13px; color: #555;
+      background: #f8f9fa; border-radius: 8px;
+      padding: 10px; margin-bottom: 12px;
+      font-family: monospace;
+    }
+    .esp-ip {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid #ddd; border-radius: 8px;
+      font-size: 15px; margin-bottom: 16px;
+      text-align: center;
+    }
+    .count {
+      font-size: 12px; color: #aaa; margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>GPS Bridge</h2>
+  <p class="sub">Sends your phone GPS to ESP32</p>
+
+  <label style="font-size:13px;color:#555;display:block;text-align:left;margin-bottom:6px;">
+    ESP32 IP address (from Serial Monitor):
+  </label>
+  <input
+    type="text"
+    id="espIP"
+    class="esp-ip"
+    placeholder="e.g. 192.168.1.105"
+    value=""
+  />
+
+  <button class="btn" id="startBtn" onclick="startSending()">
+    Start Sending My Location
+  </button>
+
+  <div id="status" class="status inf">
+    Enter ESP32 IP above, then tap Start
+  </div>
+
+  <div id="coords" class="coords" style="display:none"></div>
+  <div id="count" class="count"></div>
+</div>
+
+<script>
+  var timer      = null;
+  var sendCount  = 0;
+  var isRunning  = false;
+
+  function setStatus(msg, type) {
+    var el = document.getElementById('status');
+    el.className = 'status ' + type;
+    el.innerText  = msg;
+  }
+
+  function startSending() {
+    if (isRunning) {
+      // Stop
+      clearInterval(timer);
+      isRunning = false;
+      document.getElementById('startBtn').innerText = 'Start Sending My Location';
+      document.getElementById('startBtn').style.background = '#1D9E75';
+      setStatus('Stopped.', 'war');
+      return;
+    }
+
+    var ip = document.getElementById('espIP').value.trim();
+    if (!ip) {
+      setStatus('Please enter the ESP32 IP address first.', 'err');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setStatus('Geolocation not supported on this browser.', 'err');
+      return;
+    }
+
+    isRunning = true;
+    document.getElementById('startBtn').innerText = 'Stop';
+    document.getElementById('startBtn').style.background = '#E24B4A';
+    setStatus('Getting your location...', 'inf');
+
+    // Send immediately, then every 10 seconds
+    sendOnce(ip);
+    timer = setInterval(function() { sendOnce(ip); }, 10000);
+  }
+
+  function sendOnce(ip) {
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        var alt = pos.coords.altitude || 0;
+        var acc = pos.coords.accuracy;
+
+        // Show coordinates
+        document.getElementById('coords').style.display = 'block';
+        document.getElementById('coords').innerText =
+          'Lat: ' + lat.toFixed(6) + '\n' +
+          'Lng: ' + lng.toFixed(6) + '\n' +
+          'Accuracy: ±' + acc.toFixed(0) + ' m';
+
+        // Send to ESP32
+        var url = 'http://' + ip + '/gps?lat=' + lat +
+                  '&lng=' + lng + '&alt=' + alt;
+
+        fetch(url, { mode: 'no-cors' })
+          .then(function() {
+            sendCount++;
+            setStatus('Location sent to ESP32!', 'ok');
+            document.getElementById('count').innerText =
+              'Sent ' + sendCount + ' time(s) — auto-updates every 10s';
+          })
+          .catch(function(e) {
+            setStatus(
+              'Could not reach ESP32 at ' + ip +
+              '\nCheck IP and make sure both are on same WiFi.', 'err'
+            );
+          });
+      },
+      function(err) {
+        if (err.code === 1) {
+          setStatus('Location access denied.\nAllow location for this page.', 'err');
+        } else {
+          setStatus('Location error: ' + err.message, 'err');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+  }
+</script>
+</body>
+</html>

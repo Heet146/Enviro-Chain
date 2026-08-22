@@ -1,0 +1,31 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #0B1120;
+  color: #F1F5F9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
+    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Leaflet popup — light theme to match OSM tiles */
+.leaflet-popup-content-wrapper {
+  background: #ffffff;
+  color: #1E293B;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  border: 1px solid #E2E8F0;
+}
+
+.leaflet-popup-tip { background: #ffffff; }
+
+.leaflet-popup-content b { color: #2563EB; }
+
+.leaflet-control-zoom a {
+  background: #ffffff !important;
+  color: #374151 !important;
+  border-color: #D1D5DB !important;
+}
