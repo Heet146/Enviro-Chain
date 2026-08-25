@@ -6,10 +6,8 @@ module.exports = {
     ganache: {
       host: "127.0.0.1",
       port: 7545,           // Ganache default port
-      network_id: "5777",         // match any network
+      network_id: "*",      // Match any network id
       gas: 6721975,
-      from: "0xAf5ED2E65f43953654237d1eabf85Cca0B17958f"
-      // e.g. "0x1234abcd..."  — copy from Ganache UI
     },
 
     // ── Polygon Mumbai Testnet (sidechain) ──
