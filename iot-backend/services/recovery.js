@@ -39,23 +39,26 @@ async function recoverTamperedBlocks(db, issues) {
 
   console.log(`[Recovery] Starting recovery for ${issues.length} tampered block(s)`);
 
-  // ── Step 1: Get authoritative manifest CID from Polygon ─────────────────
-  const manifestCID = await getLatestManifestCID();
-  console.log(`[Recovery] Polygon manifest CID: ${manifestCID}`);
+  let byHash = new Map();
+  let bySeq  = new Map();
 
-  // ── Step 2: Fetch manifest from IPFS ────────────────────────────────────
-  const manifest = await fetchFromIPFS(manifestCID);
-
-  if (!manifest?.blockCIDs || !Array.isArray(manifest.blockCIDs)) {
-    throw new Error(`[Recovery] Manifest at ${manifestCID} has unexpected structure`);
+  // ── Step 1: Attempt to get authoritative manifest CID from Polygon/Ganache ──
+  if (isConfigured()) {
+    try {
+      const manifestCID = await getLatestManifestCID();
+      if (manifestCID) {
+        console.log(`[Recovery] Polygon manifest CID: ${manifestCID}`);
+        const manifest = await fetchFromIPFS(manifestCID);
+        if (manifest?.blockCIDs && Array.isArray(manifest.blockCIDs)) {
+          byHash = new Map(manifest.blockCIDs.map(e => [e.hash, e.cid]));
+          bySeq  = new Map(manifest.blockCIDs.map(e => [e.seq,  e]));
+          console.log(`[Recovery] Manifest loaded: ${manifest.blockCIDs.length} blocks (seq ${manifest.seqRange?.first}–${manifest.seqRange?.last})`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[Recovery] On-chain manifest check skipped (${err.message}). Using IPFS direct block recovery.`);
+    }
   }
-
-  console.log(`[Recovery] Manifest loaded: ${manifest.blockCIDs.length} blocks (seq ${manifest.seqRange?.first}–${manifest.seqRange?.last})`);
-
-  // ── Step 3: Build hash → CID lookup from Polygon-anchored manifest ──────
-  // Key by BOTH hash and seq for resilient lookup
-  const byHash = new Map(manifest.blockCIDs.map(e => [e.hash, e.cid]));
-  const bySeq  = new Map(manifest.blockCIDs.map(e => [e.seq,  e]));
 
   const results = [];
 
@@ -72,26 +75,27 @@ async function recoverTamperedBlocks(db, issues) {
       snapshot.forEach(child => { firebaseRecord = child.val(); });
 
       // ── Locate the trusted CID ────────────────────────────────────────────
-      // Strategy: try hash lookup first (most precise), then seq lookup
+      // Strategy: 1. on-chain manifest (hash), 2. on-chain manifest (seq), 3. block's pinned IPFS CID
       let trustedCID = null;
-      let manifestEntry = null;
 
-      if (firebaseRecord?.hash) {
-        trustedCID = byHash.get(firebaseRecord.hash) ?? null;
+      if (firebaseRecord?.hash && byHash.has(firebaseRecord.hash)) {
+        trustedCID = byHash.get(firebaseRecord.hash);
       }
       if (!trustedCID && bySeq.has(seq)) {
-        manifestEntry = bySeq.get(seq);
-        trustedCID    = manifestEntry.cid;
-        console.log(`[Recovery] Block #${seq}: hash lookup missed — fell back to seq lookup`);
+        const manifestEntry = bySeq.get(seq);
+        trustedCID = manifestEntry.cid;
+      }
+      if (!trustedCID && firebaseRecord?.ipfsCID) {
+        trustedCID = firebaseRecord.ipfsCID;
       }
 
       if (!trustedCID) {
         results.push({
           seq,
           status: 'NOT_IN_MANIFEST',
-          reason: 'Block not found in Polygon-anchored manifest. It may predate the last anchor window.',
+          reason: 'Block has no associated IPFS CID to restore from.',
         });
-        console.warn(`[Recovery] Block #${seq}: not in manifest — skipping`);
+        console.warn(`[Recovery] Block #${seq}: no IPFS CID found — skipping`);
         continue;
       }
 

@@ -8,13 +8,7 @@
  * Run once:  node clear-firebase.js
  */
 require('dotenv').config();
-const admin = require('firebase-admin');
-
-admin.initializeApp({
-  credential:  admin.credential.cert(require('./serviceAccountKey.json')),
-  databaseURL: process.env.FIREBASE_URL,
-});
-const db = admin.database();
+const { db } = require('./db-init');
 
 async function main() {
   console.log('Clearing Firebase database paths…');

@@ -6,7 +6,9 @@ async function verifyChain(db) {
     .orderByChild('seq').once('value');
 
   const blocks = [];
-  snapshot.forEach(child => blocks.push(child.val()));
+  snapshot.forEach(child => {
+    blocks.push(child.val());
+  });
 
   if (blocks.length === 0) {
     return { status: 'NO_DATA', message: 'No blocks stored yet', totalBlocks: 0 };

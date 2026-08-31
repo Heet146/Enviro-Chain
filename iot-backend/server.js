@@ -6,7 +6,6 @@ const { storeOnPolygon, anchorToGanache, verifyOnChain } = require('./blockchain
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
-const admin = require('firebase-admin');
 const mqtt = require('mqtt');
 const { WebSocketServer } = require('ws');
 
@@ -23,13 +22,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── Firebase ──────────────────────────────────────────────────────────────────
-admin.initializeApp({
-  credential: admin.credential.cert(require('./serviceAccountKey.json')),
-  databaseURL: process.env.FIREBASE_URL,
-});
-const db = admin.database();
-log.info('Firebase connected');
+// ── Database ──────────────────────────────────────────────────────────────────
+const { db } = require('./db-init');
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 const server = http.createServer(app);
@@ -121,7 +115,9 @@ app.get('/api/blocks', async (req, res) => {
     const snapshot = await db.ref('blocks')
       .orderByChild('seq').limitToLast(limit).once('value');
     const blocks = [];
-    snapshot.forEach(child => blocks.push(child.val()));
+    snapshot.forEach(child => {
+      blocks.push(child.val());
+    });
     res.json({ blocks: blocks.reverse() });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -169,7 +165,9 @@ app.get('/api/anchors', async (req, res) => {
     const snapshot = await db.ref('anchors')
       .orderByChild('anchoredAt').limitToLast(limit).once('value');
     const anchors = [];
-    snapshot.forEach(child => anchors.push(child.val()));
+    snapshot.forEach(child => {
+      anchors.push(child.val());
+    });
     res.json({ anchors: anchors.reverse() });
   } catch (e) {
     res.status(500).json({ error: e.message });

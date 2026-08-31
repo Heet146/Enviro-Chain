@@ -80,6 +80,21 @@ export default function App() {
 
   const handleIntegrityRefresh = refreshIntegrity;
 
+  const handleRecover = async () => {
+    try {
+      const res = await axios.post(`${API}/recover`);
+      const recoveredCount = res.data.recovered !== undefined ? res.data.recovered : 0;
+      alert(res.data.message || `Recovery complete! ${recoveredCount} block(s) restored from IPFS.`);
+      refreshIntegrity();
+      // Reload blocks table
+      axios.get(`${API}/blocks?limit=100`)
+        .then(r => setBlocks(r.data.blocks || []))
+        .catch(() => {});
+    } catch (e) {
+      alert(`Recovery failed: ${e.response?.data?.error || e.message}`);
+    }
+  };
+
   const latest   = blocks[0];
   const aqi      = computeAQI({ pm25: latest?.pm25, pm10: latest?.pm10, co: latest?.co });
   const location = useLocation(latest);
@@ -188,6 +203,7 @@ export default function App() {
           <IntegrityCard
             integrity={integrity}
             onRefresh={handleIntegrityRefresh}
+            onRecover={handleRecover}
           />
         </div>
 

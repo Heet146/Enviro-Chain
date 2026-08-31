@@ -1,4 +1,9 @@
-export default function IntegrityCard({ integrity, onRefresh }) {
+import { useState } from 'react';
+
+export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+
   if (!integrity) {
     return (
       <div className="card integrity-card">
@@ -13,6 +18,24 @@ export default function IntegrityCard({ integrity, onRefresh }) {
   const pct     = integrity.totalBlocks > 0
     ? Math.round((integrity.verified / integrity.totalBlocks) * 100)
     : 0;
+
+  const handleVerifyClick = async () => {
+    setIsVerifying(true);
+    try {
+      if (onRefresh) await onRefresh();
+    } finally {
+      setTimeout(() => setIsVerifying(false), 400);
+    }
+  };
+
+  const handleRecoverClick = async () => {
+    setIsRecovering(true);
+    try {
+      if (onRecover) await onRecover();
+    } finally {
+      setIsRecovering(false);
+    }
+  };
 
   return (
     <div className="card integrity-card">
@@ -51,12 +74,30 @@ export default function IntegrityCard({ integrity, onRefresh }) {
         </div>
       )}
 
-      <button
-        className="btn-verify"
-        onClick={onRefresh}
-      >
-        Re-verify chain
-      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto' }}>
+        <button
+          className="btn-verify"
+          disabled={isVerifying}
+          onClick={handleVerifyClick}
+        >
+          {isVerifying ? 'Verifying Chain...' : 'Re-verify chain'}
+        </button>
+
+        {!intact && onRecover && (
+          <button
+            className="btn-verify"
+            disabled={isRecovering}
+            style={{
+              background: 'rgba(248, 113, 113, 0.15)',
+              borderColor: 'rgba(248, 113, 113, 0.4)',
+              color: '#F87171'
+            }}
+            onClick={handleRecoverClick}
+          >
+            {isRecovering ? 'Restoring...' : 'Restore from IPFS & Blockchain'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

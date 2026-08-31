@@ -1,0 +1,38 @@
+# iot-backend/.env
+FIREBASE_URL=https://iot-env-monitor-90a09-default-rtdb.asia-southeast1.firebasedatabase.app
+MQTT_BROKER=mqtt://broker.hivemq.com
+MQTT_TOPIC=iot/envmonitor/data
+PORT=3001
+
+# ── Location fallback ────────────────────────────────────────────────────────
+# Used when device has no GPS fix and no browser location has been pushed.
+# Defaults to KJ Somaiya College of Engineering if unset.
+DEFAULT_LAT=19.072836
+DEFAULT_LNG=72.899803
+
+# ── Feature flags ─────────────────────────────────────────────────────────────
+# Set to false to skip IPFS uploads (offline dev / CI)
+IPFS_ENABLED=true
+
+# ── IPFS ──────────────────────────────────────────────────────────────────────
+# Provider: "pinata" (recommended, no daemon) or "kubo" (local daemon)
+IPFS_PROVIDER=pinata
+
+# Pinata Cloud — free tier, sign up at https://app.pinata.cloud
+# Go to API Keys → New Key → enable pinFileToIPFS + pinJSONToIPFS → copy JWT
+PINATA_JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiJiNDhmYTFiYi0wZDkwLTQwODAtOWQ2ZS02OWZhNmJkOGU0MWMiLCJlbWFpbCI6InZpdmVrZ290aGk5NUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGluX3BvbGljeSI6eyJyZWdpb25zIjpbeyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJGUkExIn0seyJkZXNpcmVkUmVwbGljYXRpb25Db3VudCI6MSwiaWQiOiJOWUMxIn1dLCJ2ZXJzaW9uIjoxfSwibWZhX2VuYWJsZWQiOmZhbHNlLCJzdGF0dXMiOiJBQ1RJVkUifSwiYXV0aGVudGljYXRpb25UeXBlIjoic2NvcGVkS2V5Iiwic2NvcGVkS2V5S2V5IjoiNmM5M2I1NWE2NjU4YjI1NjcwMDciLCJzY29wZWRLZXlTZWNyZXQiOiJhZDgyOGE0NzJhZjc5MjVmMWZjZTBlYzdmZGQ1MjdlZGY1ZDc4MWQwMzA2MmNjNjMzZDE1YjJiZDkxYTkzODgyIiwiZXhwIjoxODA3ODU2NDQ0fQ.4FTgqSmktfBVJdsfyYtCrb06PhC2WumxO5z-Cv6i-lE
+
+# Public IPFS gateway for reads (change if you prefer a different CDN)
+IPFS_GATEWAY=https://gateway.pinata.cloud/ipfs
+IPFS_TIMEOUT_MS=20000
+
+# ── Kubo (local daemon) — only used when IPFS_PROVIDER=kubo ──────────────────
+# IPFS_API_URL=http://127.0.0.1:5001
+# IPFS_PROJECT_ID=
+# IPFS_PROJECT_SECRET=
+
+# ── Polygon ───────────────────────────────────────────────────────────────────
+# Amoy testnet (free — get RPC from Infura/Alchemy/public endpoint)
+POLYGON_RPC_URL=https://polygon-amoy.g.alchemy.com/v2/Mxjjab4_jKdt1nNRmvpWJ
+POLYGON_PRIVATE_KEY=186eb90ddfad34321fc4130fb695109885b2ebcd8d27f20b25fe12e6e30d6675
+ANCHOR_CONTRACT_ADDRESS=0xF6785aCC7Ec841ebE6Bd1635B1a992972D6E207A

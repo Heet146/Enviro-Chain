@@ -5,7 +5,7 @@ module.exports = {
     // ── Ganache local Ethereum (main chain for development) ──
     ganache: {
       host: "127.0.0.1",
-      port: 7545,           // Ganache default port
+      port: 8545,           // Ganache default port
       network_id: "*",      // Match any network id
       gas: 6721975,
     },

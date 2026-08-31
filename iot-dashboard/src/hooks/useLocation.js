@@ -42,8 +42,13 @@ export function useLocation(latest) {
   if (deviceValid) {
     return { lat: latest.lat, lng: latest.lng, source: 'Live GPS', browserCoords };
   }
-  if (latest?.effectiveLat && latest?.locationSource === 'palm-beach-simulation') {
-    return { lat: latest.effectiveLat, lng: latest.effectiveLng, source: 'Palm Beach Simulation', browserCoords };
+  if (latest?.effectiveLat && latest?.effectiveLng && latest?.locationSource && latest?.locationSource !== 'default') {
+    return { 
+      lat: latest.effectiveLat, 
+      lng: latest.effectiveLng, 
+      source: latest.locationSource === 'browser' ? 'Browser location' : 'Live GPS', 
+      browserCoords 
+    };
   }
   if (browserCoords) {
     return { lat: browserCoords.lat, lng: browserCoords.lng, source: 'Browser location', browserCoords };

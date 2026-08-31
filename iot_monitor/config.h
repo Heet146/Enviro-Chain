@@ -3,8 +3,8 @@
 #define CONFIG_H
 
 // ── Change these two lines to match your WiFi ──
-#define WIFI_SSID     "Gothi"       // e.g. "JioFiber_Home"
-#define WIFI_PASS     "vivek1339"   // e.g. "mypassword123"
+#define WIFI_SSID     "Heet"       // e.g. "JioFiber_Home"
+#define WIFI_PASS     "wehc0336"   // e.g. "mypassword123"
 
 // ── MQTT broker (free public broker, no account needed) ──
 #define MQTT_HOST     "broker.hivemq.com"
