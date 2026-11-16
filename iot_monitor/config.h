@@ -13,6 +13,6 @@
 #define DEVICE_ID     "NODE_001"
 
 // ── How often to send a reading (milliseconds) ──
-#define INTERVAL_MS   15000   // 15 seconds — good for testing
+#define INTERVAL_MS   60000   // 60 seconds 
 
 #endif

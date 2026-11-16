@@ -18,7 +18,7 @@
 const { uploadToIPFS }   = require('./ipfs');
 const { storeCID, isConfigured } = require('./polygon');
 
-const ANCHOR_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const ANCHOR_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const ANCHOR_BATCH_SIZE  = 500;             // blocks per manifest
 
 /**
