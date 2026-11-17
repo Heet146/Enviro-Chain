@@ -12,6 +12,12 @@
 #define MQTT_TOPIC    "iot/envmonitor/data"
 #define DEVICE_ID     "NODE_001"
 
+// Chain recovery seed. For an existing Firebase history, set these once to
+// the sequence and full hash of its newest block before the first upload of
+// firmware with persistent chain state. Leave at 0/empty for a fresh database.
+#define INITIAL_BLOCK_SEQ 0
+#define INITIAL_PREV_HASH ""
+
 // ── How often to send a reading (milliseconds) ──
 #define INTERVAL_MS   60000   // 60 seconds 
 

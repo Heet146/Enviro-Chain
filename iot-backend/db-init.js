@@ -3,10 +3,12 @@
 const fs = require('fs');
 const path = require('path');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 const { getDatabase } = require('firebase-admin/database');
 const log = require('./logger');
 
 let db;
+let auth = null;
 
 const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
 const hasKey = fs.existsSync(serviceAccountPath);
@@ -18,6 +20,7 @@ if (hasKey && process.env.FIREBASE_URL && !process.env.FIREBASE_URL.includes('<y
       databaseURL: process.env.FIREBASE_URL,
     }) : getApps()[0];
     db = getDatabase(app);
+    auth = getAuth(app);
     log.info('Firebase Realtime Database connected');
   } catch (err) {
     log.warn(`Firebase initialization failed (${err.message}). Using local store.`);
@@ -32,7 +35,9 @@ function createLocalDb() {
   const store = {
     blocks: {},
     nodes: {},
-    anchors: {}
+    anchors: {},
+    locations: {},
+    accessControl: { users: {} }
   };
 
   const storeFilePath = path.join(__dirname, '.local-db.json');
@@ -42,6 +47,8 @@ function createLocalDb() {
       if (data.blocks) store.blocks = data.blocks;
       if (data.nodes) store.nodes = data.nodes;
       if (data.anchors) store.anchors = data.anchors;
+      if (data.locations) store.locations = data.locations;
+      if (data.accessControl) store.accessControl = data.accessControl;
     } catch (_) {}
   }
 
@@ -108,13 +115,15 @@ function createLocalDb() {
         items = items.slice(items.length - this.limit);
       }
 
-      const val = parts.length === 2 ? target : (items.length ? {} : null);
-      if (parts.length < 2 && val) {
-        items.forEach(i => { val[i.key] = i.val; });
+      let val = target;
+      if (parts.length === 1) {
+        val = items.length ? {} : null;
+        if (val) items.forEach(i => { val[i.key] = i.val; });
       }
 
       return {
-        val: () => (parts.length === 2 ? target : (Object.keys(val || {}).length ? val : null)),
+        val: () => val,
+        exists: () => val !== null && val !== undefined,
         forEach: (callback) => {
           items.forEach(i => {
             callback({
@@ -134,33 +143,35 @@ function createLocalDb() {
 
     async set(value) {
       const parts = this.pathStr.split('/').filter(Boolean);
-      if (parts.length === 1) {
-        store[parts[0]] = value;
-      } else if (parts.length === 2) {
-        if (!store[parts[0]]) store[parts[0]] = {};
-        store[parts[0]][parts[1]] = value;
+      let target = store;
+      for (const part of parts.slice(0, -1)) {
+        if (!target[part] || typeof target[part] !== 'object') target[part] = {};
+        target = target[part];
       }
+      if (parts.length) target[parts[parts.length - 1]] = value;
+      else Object.assign(store, value || {});
       persist();
     }
 
     async update(values) {
       const parts = this.pathStr.split('/').filter(Boolean);
-      if (parts.length === 1) {
-        store[parts[0]] = { ...(store[parts[0]] || {}), ...values };
-      } else if (parts.length === 2) {
-        if (!store[parts[0]]) store[parts[0]] = {};
-        store[parts[0]][parts[1]] = { ...(store[parts[0]][parts[1]] || {}), ...values };
+      let target = store;
+      for (const part of parts.slice(0, -1)) {
+        if (!target[part] || typeof target[part] !== 'object') target[part] = {};
+        target = target[part];
       }
+      if (parts.length) {
+        const key = parts[parts.length - 1];
+        target[key] = { ...(target[key] || {}), ...values };
+      } else Object.assign(store, values || {});
       persist();
     }
 
     async remove() {
       const parts = this.pathStr.split('/').filter(Boolean);
-      if (parts.length === 1) {
-        delete store[parts[0]];
-      } else if (parts.length === 2) {
-        if (store[parts[0]]) delete store[parts[0]][parts[1]];
-      }
+      let target = store;
+      for (const part of parts.slice(0, -1)) target = target?.[part];
+      if (parts.length && target) delete target[parts[parts.length - 1]];
       persist();
     }
 
@@ -188,4 +199,4 @@ function createLocalDb() {
   };
 }
 
-module.exports = { db };
+module.exports = { db, auth };

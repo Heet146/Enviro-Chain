@@ -2,8 +2,8 @@
 
 body {
   margin: 0;
-  background: #0B1120;
-  color: #F1F5F9;
+  background: var(--bg, #0B1120);
+  color: var(--text, #F1F5F9);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
     'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

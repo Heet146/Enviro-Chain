@@ -13,8 +13,10 @@ function isAbnormal(b) {
 
 export default function DataTable({ blocks, location }) {
   const [page, setPage] = useState(0);
-  const totalPages = Math.ceil(blocks.length / PAGE_SIZE);
-  const slice = blocks.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const sortedBlocks = [...blocks].sort((a, b) => Number(b.seq) - Number(a.seq));
+  const totalPages = Math.ceil(sortedBlocks.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(totalPages - 1, 0));
+  const slice = sortedBlocks.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <div className="card table-card">
@@ -23,17 +25,18 @@ export default function DataTable({ blocks, location }) {
         <div className="pagination">
           <button
             className="page-btn"
-            disabled={page === 0}
+            disabled={currentPage === 0}
             onClick={() => setPage(p => p - 1)}
           >‹</button>
-          <span className="page-info">{page + 1} / {Math.max(totalPages, 1)}</span>
+          <span className="page-info">{currentPage + 1} / {Math.max(totalPages, 1)}</span>
           <button
             className="page-btn"
-            disabled={page >= totalPages - 1}
+            disabled={currentPage >= totalPages - 1}
             onClick={() => setPage(p => p + 1)}
           >›</button>
         </div>
       </div>
+      <p className="block-order-note">Global chain numbers, newest first. Gaps are expected when readings from other places were recorded between this place’s blocks.</p>
 
       <div className="table-scroll">
         <table className="data-table">
@@ -63,11 +66,14 @@ export default function DataTable({ blocks, location }) {
                     {b.pm10}
                   </td>
                   <td>{b.co}</td>
-                  <td className="td-gps" title={`Source: ${b.locationSource === 'default' && location?.source === 'Browser location' ? 'browser override' : (b.locationSource || 'raw')}`}>
+                  <td className="td-gps" title={`Source: ${b.locationSource === 'default' && ['Browser location', 'Assigned place'].includes(location?.source) ? location.source : (b.locationSource || 'raw')}`}>
                     {(() => {
+                      if (b.locationSource === 'default' && !['Browser location', 'Assigned place'].includes(location?.source)) {
+                        return <span className="td-dim">No GPS fix</span>;
+                      }
                       let lat = b.effectiveLat ?? b.lat;
                       let lng = b.effectiveLng ?? b.lng;
-                      if (b.locationSource === 'default' && location?.source === 'Browser location') {
+                      if (b.locationSource === 'default' && ['Browser location', 'Assigned place'].includes(location?.source)) {
                         lat = location.lat;
                         lng = location.lng;
                       }

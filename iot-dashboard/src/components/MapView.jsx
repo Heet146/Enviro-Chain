@@ -33,6 +33,7 @@ function RecenterMap({ lat, lng }) {
 const SOURCE_META = {
   device:  { label: 'Live GPS',          dot: '#16A34A', color: '#166534', bg: '#DCFCE7' },
   browser: { label: 'Browser location',  dot: '#CA8A04', color: '#713F12', bg: '#FEF9C3' },
+  assigned: { label: 'Assigned place',   dot: '#0284C7', color: '#075985', bg: '#E0F2FE' },
   default: { label: 'Default location',  dot: '#6B7280', color: '#374151', bg: '#F3F4F6' },
 };
 
@@ -40,6 +41,7 @@ const SOURCE_META = {
 const DISPLAY_META = {
   'Live GPS':          SOURCE_META.device,
   'Browser location':  SOURCE_META.browser,
+  'Assigned place':    SOURCE_META.assigned,
   'Default location':  SOURCE_META.default,
 };
 
@@ -66,6 +68,15 @@ function getEmissionColor(pm25) {
  *              center when no enriched blocks are present yet
  */
 export default function MapView({ blocks, location }) {
+  if (location?.source === 'No live GPS location') {
+    return (
+      <div className="card map-empty-card">
+        <div className="card-title">Emission Heatmap & Live Track</div>
+        <div className="map-empty-state"><span>📡</span><strong>No live GPS location</strong><p>A sensor reading with a valid GPS fix will appear here when a node is connected.</p></div>
+      </div>
+    );
+  }
+
   // Blocks with any plottable position (effective preferred, raw fallback)
   const plottable = blocks
     .filter(b => {
@@ -91,10 +102,10 @@ export default function MapView({ blocks, location }) {
 
   // OVERRIDE: If the block fell back to default but we NOW have a live browser location,
   // upgrade the display to use the live browser location!
-  if (latestBlock?.locationSource === 'default' && location.source === 'Browser location') {
+  if (latestBlock?.locationSource === 'default' && ['Browser location', 'Assigned place'].includes(location.source)) {
     centerLat = location.lat;
     centerLng = location.lng;
-    sourceMeta = SOURCE_META.browser;
+    sourceMeta = location.source === 'Assigned place' ? SOURCE_META.assigned : SOURCE_META.browser;
   }
 
   return (
@@ -128,10 +139,10 @@ export default function MapView({ blocks, location }) {
           let bLng = b.effectiveLng ?? b.lng;
           let bSrc = SOURCE_META[b.locationSource] ?? SOURCE_META.default;
 
-          if (b.locationSource === 'default' && location.source === 'Browser location') {
+          if (b.locationSource === 'default' && ['Browser location', 'Assigned place'].includes(location.source)) {
             bLat = location.lat;
             bLng = location.lng;
-            bSrc = SOURCE_META.browser;
+            bSrc = location.source === 'Assigned place' ? SOURCE_META.assigned : SOURCE_META.browser;
           }
           
           const emissionColor = getEmissionColor(b.pm25 || 0);
@@ -168,10 +179,10 @@ export default function MapView({ blocks, location }) {
           let bLng  = latestBlock.effectiveLng ?? latestBlock.lng;
           let bSrc  = SOURCE_META[latestBlock.locationSource] ?? SOURCE_META.default;
 
-          if (latestBlock.locationSource === 'default' && location.source === 'Browser location') {
+          if (latestBlock.locationSource === 'default' && ['Browser location', 'Assigned place'].includes(location.source)) {
             bLat = location.lat;
             bLng = location.lng;
-            bSrc = SOURCE_META.browser;
+            bSrc = location.source === 'Assigned place' ? SOURCE_META.assigned : SOURCE_META.browser;
           }
           
           const emissionColor = getEmissionColor(latestBlock.pm25 || 0);

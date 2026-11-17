@@ -16,13 +16,13 @@ async function verifyChain(db) {
 
   let verified = 0;
   let tampered = 0;
+  let hashMismatches = 0;
+  let chainBreaks = 0;
   const issues = [];
 
-  // The ESP32 maintains its own rolling prevHash that never resets when Firebase
-  // is cleared. So the first block stored after a DB wipe will have a non-GENESIS
-  // prev (it points to the last hash the ESP32 produced before the wipe).
-  // We treat the first block in the database as the chain anchor — its own hash
-  // is still fully verified; only the CROSS-BLOCK linkage is skipped for block[0].
+  // Treat the first block still present in Firebase as the local chain anchor.
+  // Its payload hash is verified, but its predecessor is not required to be
+  // present (it may predate retention or a database cleanup).
   let expectedPrev = blocks[0].prev; // start from whatever the first block claims
 
   for (let i = 0; i < blocks.length; i++) {
@@ -56,6 +56,7 @@ async function verifyChain(db) {
     if (recomputed !== block.hash) {
       // The block's payload was altered after it left the ESP32
       tampered++;
+      hashMismatches++;
       issues.push({
         seq:     block.seq,
         reason:  'Hash mismatch — data was changed after storage',
@@ -65,9 +66,11 @@ async function verifyChain(db) {
     } else if (block.prev !== expectedPrev) {
       // A block is missing between this one and the previous stored block
       tampered++;
+      chainBreaks++;
       issues.push({
         seq:    block.seq,
-        reason: 'Chain broken — a block was deleted or reordered'
+        reason: 'Chain broken — a block was deleted or reordered',
+        missingPrevHash: block.prev
       });
     } else {
       verified++;
@@ -77,10 +80,12 @@ async function verifyChain(db) {
   }
 
   return {
-    status:         tampered === 0 ? 'INTACT' : 'COMPROMISED',
+    status:         hashMismatches > 0 ? 'COMPROMISED' : chainBreaks > 0 ? 'CHAIN_BROKEN' : 'INTACT',
     totalBlocks:    blocks.length,
     verified,
     tampered,
+    hashMismatches,
+    chainBreaks,
     integrityScore: ((verified / blocks.length) * 100).toFixed(1) + '%',
     issues
   };

@@ -5,6 +5,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <TinyGPS++.h>
+#include <Preferences.h>
 #include "config.h"
 #include "sensors.h"
 #include "hashchain.h"
@@ -22,6 +23,7 @@ WebServer    httpServer(80);   // ← ESP32 listens on port 80
 // ── Hash chain state ──
 String prevHash = GENESIS;
 int    blockSeq = 0;
+Preferences chainPreferences;
 
 // ── GPS state — phone or hardware ──
 double gpsLat    = 0.0;
@@ -229,7 +231,8 @@ void sendBlock() {
 
   // Build JSON payload
   StaticJsonDocument<600> doc;
-  doc["seq"]       = ++blockSeq;
+  const int nextSeq = blockSeq + 1;
+  doc["seq"]       = nextSeq;
   doc["nodeId"]    = DEVICE_ID;
   doc["ts"]        = millis();
   doc["temp"]      = s.temperature;
@@ -252,15 +255,25 @@ void sendBlock() {
 
   String finalJson;
   serializeJson(doc, finalJson);
-  prevHash = currentHash;
 
   // Publish
   if (!mqtt.connected()) connectMQTT();
   bool ok = mqtt.publish(MQTT_TOPIC, finalJson.c_str(), false);
+  if (ok) {
+    // Advance the local chain only when PubSubClient accepts the packet.
+    // Advancing before publish would make the next block point to a hash the
+    // backend may never have received.
+    blockSeq = nextSeq;
+    prevHash = currentHash;
+    chainPreferences.putInt("seq", blockSeq);
+    chainPreferences.putString("prev", prevHash);
+  } else {
+    Serial.println("Publish failed; retaining sequence and previous hash for retry.");
+  }
 
   // Serial output
   Serial.println("─────────────────────────────");
-  Serial.println("Block   : #" + String(blockSeq));
+  Serial.println("Block   : #" + String(nextSeq));
   Serial.println("Temp    : " + String(s.temperature, 1) + " °C");
   Serial.println("Humidity: " + String(s.humidity, 1)    + " %");
   Serial.println("CO raw  : " + String(s.co_raw));
@@ -360,6 +373,26 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("=== IoT Environmental Monitor ===");
+
+  // Keep chain state in ESP32 NVS so a reboot/reflash doesn't silently start
+  // a second chain. For an existing database, seed config.h with its latest
+  // block before this firmware is first installed.
+  chainPreferences.begin("envchain", false);
+  if (chainPreferences.getBool("initialized", false)) {
+    blockSeq = chainPreferences.getInt("seq", 0);
+    prevHash = chainPreferences.getString("prev", GENESIS);
+  } else {
+    blockSeq = INITIAL_BLOCK_SEQ;
+    if (String(INITIAL_PREV_HASH).length() == 64) {
+      prevHash = INITIAL_PREV_HASH;
+    } else {
+      prevHash = GENESIS;
+    }
+    chainPreferences.putInt("seq", blockSeq);
+    chainPreferences.putString("prev", prevHash);
+    chainPreferences.putBool("initialized", true);
+  }
+  Serial.println("Chain resumes at block #" + String(blockSeq));
 
   gpsSerial.begin(9600, SERIAL_8N1, 26, 27);
   pmsSerial.begin(9600, SERIAL_8N1, 25, -1);   // RX=25, TX unused

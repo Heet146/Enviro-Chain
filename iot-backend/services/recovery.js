@@ -67,6 +67,46 @@ async function recoverTamperedBlocks(db, issues) {
     console.log(`[Recovery] Processing block #${seq}: ${issue.reason}`);
 
     try {
+      // A link break means the current block points to a missing predecessor.
+      // Restore that exact hash from the trusted manifest when it was archived.
+      if (issue.missingPrevHash) {
+        const predecessorHash = issue.missingPrevHash;
+        const predecessorCID = byHash.get(predecessorHash);
+        if (!predecessorCID) {
+          results.push({
+            seq,
+            status: 'PREDECESSOR_NOT_ARCHIVED',
+            reason: `Missing predecessor ${predecessorHash.slice(0, 16)}… is not present in the trusted IPFS manifest.`,
+          });
+          continue;
+        }
+
+        const predecessor = await fetchFromIPFS(predecessorCID);
+        if (predecessor?.hash !== predecessorHash) {
+          throw new Error('IPFS predecessor hash does not match the chain link.');
+        }
+
+        const existing = await db.ref(`blocks/${predecessorHash}`).once('value');
+        if (!existing.exists()) {
+          const nodeSnapshot = await db.ref(`nodes/${predecessor.nodeId}`).once('value');
+          const node = nodeSnapshot.val() || {};
+          await db.ref(`blocks/${predecessorHash}`).set({
+            ...predecessor,
+            effectiveLat: predecessor.lat,
+            effectiveLng: predecessor.lng,
+            locationSource: predecessor.gpsSource || 'hardware',
+            locationId: node.locationId || null,
+            ipfsCID: predecessorCID,
+            savedAt: Date.now(),
+            restoredAt: Date.now(),
+            restoredFrom: `ipfs:${predecessorCID}`,
+            restoredVia: 'polygon-manifest',
+          });
+        }
+        results.push({ seq: predecessor.seq, status: 'RESTORED', cid: predecessorCID, restoredAs: 'missing predecessor' });
+        continue;
+      }
+
       // ── Step 4: Load the (potentially tampered) block from Firebase ──────
       const snapshot = await db.ref('blocks')
         .orderByChild('seq').equalTo(seq).once('value');
@@ -129,6 +169,7 @@ async function recoverTamperedBlocks(db, issues) {
         effectiveLat:   firebaseRecord?.effectiveLat   ?? null,
         effectiveLng:   firebaseRecord?.effectiveLng   ?? null,
         locationSource: firebaseRecord?.locationSource ?? null,
+        locationId:     firebaseRecord?.locationId     ?? null,
         savedAt:        firebaseRecord?.savedAt        ?? null,
 
         // Recovery metadata

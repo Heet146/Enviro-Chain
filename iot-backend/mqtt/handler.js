@@ -51,25 +51,33 @@ async function handleIncomingBlock(block, { db, broadcast, browserLocation }) {
     `${effectiveLat.toFixed(5)}, ${effectiveLng.toFixed(5)}`
   );
 
+  // Location assignments are administration metadata, separate from the
+  // device payload, so they do not alter the block's hash-chain fields.
+  const nodeSnapshot = await db.ref('nodes/' + block.nodeId).once('value');
+  const locationId = nodeSnapshot.val()?.locationId || null;
+
   // ── Step 3: Firebase — persist block ─────────────────────────────────────
   // Original block fields are spread first; derived fields follow.
   // If there is ever a key collision, derived fields win — but none of
   // the derived keys (effectiveLat, effectiveLng, locationSource, ipfsCID,
   // savedAt) overlap with the device payload.
+  const savedAt = Date.now();
   await db.ref('blocks/' + block.hash).set({
     ...block,
     effectiveLat,
     effectiveLng,
     locationSource,
+    locationId,
     ipfsCID,   // null when IPFS unavailable — do NOT trust for recovery
-    savedAt:   Date.now(),
+    savedAt,
   });
 
   // ── Step 4: Firebase — update node status ─────────────────────────────────
   await db.ref('nodes/' + block.nodeId).update({
-    lastSeen:      Date.now(),
+    lastSeen:      savedAt,
     lastBlock:     block.seq,
     status:        'ACTIVE',
+    demo:          block.gpsSource === 'Demo simulator' || /^SIM[-_]/i.test(block.nodeId || ''),
     lat:           block.lat,
     lng:           block.lng,
     effectiveLat,
@@ -88,7 +96,7 @@ async function handleIncomingBlock(block, { db, broadcast, browserLocation }) {
   // ── Step 6: Broadcast to dashboards ──────────────────────────────────────
   broadcast({
     type:  'NEW_BLOCK',
-    block: { ...block, effectiveLat, effectiveLng, locationSource, ipfsCID },
+    block: { ...block, effectiveLat, effectiveLng, locationSource, locationId, ipfsCID, savedAt },
     integrity,
   });
 }

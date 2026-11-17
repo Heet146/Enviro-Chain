@@ -14,7 +14,10 @@ export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
     );
   }
 
-  const intact  = integrity.status === 'INTACT';
+  const intact = integrity.status === 'INTACT';
+  const chainBroken = integrity.status === 'CHAIN_BROKEN';
+  const hashMismatches = integrity.hashMismatches ?? (integrity.status === 'COMPROMISED' ? integrity.tampered : 0);
+  const chainBreaks = integrity.chainBreaks ?? 0;
   const pct     = integrity.totalBlocks > 0
     ? Math.round((integrity.verified / integrity.totalBlocks) * 100)
     : 0;
@@ -41,9 +44,9 @@ export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
     <div className="card integrity-card">
       <div className="card-title">Hash-Chain Integrity</div>
 
-      <div className={`integrity-status ${intact ? 'intact' : 'compromised'}`}>
-        <span className="integrity-icon">{intact ? '✓' : '✗'}</span>
-        <span>{intact ? 'INTACT' : 'COMPROMISED'}</span>
+      <div className={`integrity-status ${intact ? 'intact' : chainBroken ? 'broken' : 'compromised'}`}>
+        <span className="integrity-icon">{intact ? '✓' : chainBroken ? '!' : '✗'}</span>
+        <span>{intact ? 'INTACT' : chainBroken ? 'CHAIN BROKEN' : 'COMPROMISED'}</span>
       </div>
 
       <div className="integrity-bar-wrap">
@@ -51,7 +54,7 @@ export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
           className="integrity-bar"
           style={{
             width: `${pct}%`,
-            background: intact ? '#34D399' : '#F87171'
+            background: intact ? '#34D399' : chainBroken ? '#F5BD4F' : '#F87171'
           }}
         />
       </div>
@@ -60,8 +63,11 @@ export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
       <div className="integrity-stats">
         <div>Total blocks <strong>{integrity.totalBlocks}</strong></div>
         <div>Verified <strong style={{ color: '#34D399' }}>{integrity.verified}</strong></div>
-        <div>Tampered <strong style={{ color: '#F87171' }}>{integrity.tampered}</strong></div>
+        <div>Hash mismatches <strong style={{ color: hashMismatches ? '#F87171' : '#34D399' }}>{hashMismatches}</strong></div>
+        <div>Broken links <strong style={{ color: chainBreaks ? '#F5BD4F' : '#34D399' }}>{chainBreaks}</strong></div>
       </div>
+
+      {chainBroken && hashMismatches === 0 && <div className="chain-gap-note">A chain link is missing or out of order. This can happen after deleting stored blocks or restarting a device; it does not by itself mean a block’s readings were edited.</div>}
 
       {integrity.issues?.length > 0 && (
         <div className="integrity-issues">
@@ -83,7 +89,7 @@ export default function IntegrityCard({ integrity, onRefresh, onRecover }) {
           {isVerifying ? 'Verifying Chain...' : 'Re-verify chain'}
         </button>
 
-        {!intact && onRecover && (
+        {(hashMismatches > 0 || chainBreaks > 0) && onRecover && (
           <button
             className="btn-verify"
             disabled={isRecovering}
